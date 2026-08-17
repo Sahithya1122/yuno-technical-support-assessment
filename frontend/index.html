@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Yunique Fashion Store</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f6f8;
+            color: #222;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 24px;
+        }
+
+        .store-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        .product {
+            padding: 18px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .price {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 12px 0;
+        }
+
+        #payment-form {
+            margin-top: 24px;
+            min-height: 200px;
+        }
+
+        #pay-button {
+            margin-top: 20px;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #111;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #pay-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #f0f0f0;
+            display: none;
+            white-space: pre-wrap;
+        }
+    </style>
+
+    <!-- Yuno Web SDK -->
+    <script
+        src="https://sdk-web.y.uno/v1.6/main.js"
+        async
+        defer>
+    </script>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="store-card">
+
+        <h1>Yunique Fashion Store</h1>
+
+        <div class="product">
+            <h2>Premium Fashion Item</h2>
+
+            <p>
+                Test product for the Yuno Technical Support Analyst assessment.
+            </p>
+
+            <div class="price">$50.00</div>
+        </div>
+
+        <h2>Checkout</h2>
+
+        <div id="payment-form"></div>
+
+        <button id="pay-button" disabled>
+            Pay $50.00
+        </button>
+
+        <div id="status"></div>
+
+    </div>
+</div>
+
+<script>
+    // --------------------------------------------------
+    // YUNO CONFIGURATION
+    // --------------------------------------------------
+
+    // Your Organization Public Key only.
+    // Never put the secret key in this file.
+    const YUNO_PUBLIC_KEY = "sandbox_gAAAAABmaGCZVfUZxTWtADsJzCAxbL4Z0EW6s9qdIkSMCYAwE0xZzbFObZTFa9nSS3bJmKZYHvbCP72ERpEM4rj6pa1BKI-daDHHHS1wSVbltMJof9yNgFUeB4ZJacGK_j5KC49rpreonirM5YBEm6daxiZf9SPANmYD3cOdYlVwDJi6qmFXDu3iGHYECqeApLIHmd11K2pzVjjl7x3TBCEjF4d_2P2kagM12MYGrbbeEhweKFUABnENy5FCrCqkF65WmZY7xELh";
+
+    let yuno = null;
+    let checkoutSession = null;
+
+    const payButton =
+        document.getElementById("pay-button");
+
+    const statusBox =
+        document.getElementById("status");
+
+    function showStatus(message) {
+        statusBox.style.display = "block";
+        statusBox.textContent = message;
+    }
+
+    // --------------------------------------------------
+    // GET CHECKOUT SESSION FROM YOUR BACKEND
+    // --------------------------------------------------
+
+    async function createCheckoutSession() {
+
+        const response = await fetch(
+            "/api/create-checkout-session",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Unable to create checkout session"
+            );
+        }
+
+        return data;
+    }
+
+    // --------------------------------------------------
+    // SEND ONE-TIME TOKEN TO YOUR BACKEND
+    // --------------------------------------------------
+
+    async function createPayment(
+        oneTimeToken
+    ) {
+
+        const response = await fetch(
+            "/api/create-payment",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    checkout_session:
+                        checkoutSession,
+
+                    one_time_token:
+                        oneTimeToken
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Payment creation failed"
+            );
+        }
+
+        return data;
+    }
+
+    // --------------------------------------------------
+    // INITIALIZE YUNO CHECKOUT
+    // --------------------------------------------------
+
+    async function initializeCheckout() {
+
+        try {
+
+            showStatus(
+                "Creating checkout session..."
+            );
+
+            // Initialize Yuno SDK
+            yuno =
+                await Yuno.initialize(
+                    YUNO_PUBLIC_KEY
+                );
+
+            // Ask backend for session
+            const session =
+                await createCheckoutSession();
+
+            checkoutSession =
+                session.checkout_session;
+
+            console.log(
+                "Checkout session:",
+                checkoutSession
+            );
+
+            // Start Full Checkout
+            await yuno.startCheckout({
+
+                checkoutSession:
+                    checkoutSession,
+
+                elementSelector:
+                    "#payment-form",
+
+                countryCode:
+                    "US",
+
+                language:
+                    "en",
+
+                showLoading:
+                    true,
+
+                showPaymentStatus:
+                    true,
+
+                card: {
+                    isCreditCardProcessingOnly:
+                        true,
+
+                    onChange: ({ error }) => {
+
+                        if (error) {
+                            console.error(
+                                "Card form error:",
+                                error
+                            );
+                        }
+                    }
+                },
+
+                onLoading: (args) => {
+
+                    console.log(
+                        "Yuno loading:",
+                        args
+                    );
+                },
+
+                onPaymentMethodSelected: () => {
+
+                    console.log(
+                        "Payment method selected"
+                    );
+                },
+
+                // ----------------------------------
+                // THIS IS THE IMPORTANT PART
+                // ----------------------------------
+
+                async yunoCreatePayment(
+                    oneTimeToken
+                ) {
+
+                    console.log(
+                        "One-time token received"
+                    );
+
+                    showStatus(
+                        "Creating payment..."
+                    );
+
+                    try {
+
+                        const result =
+                            await createPayment(
+                                oneTimeToken
+                            );
+
+                        console.log(
+                            "Payment response:",
+                            result
+                        );
+
+                        showStatus(
+                            "Payment created successfully."
+                        );
+
+                        // Let Yuno continue
+                        if (
+                            yuno &&
+                            typeof yuno.continuePayment ===
+                                "function"
+                        ) {
+                            await yuno.continuePayment();
+                        }
+
+                    } catch (error) {
+
+                        console.error(
+                            "Payment creation error:",
+                            error
+                        );
+
+                        showStatus(
+                            "Payment creation failed: " +
+                            error.message
+                        );
+
+                        throw error;
+                    }
+                },
+
+                yunoPaymentResult: (
+                    status,
+                    subStatus
+                ) => {
+
+                    console.log(
+                        "Payment result:",
+                        status,
+                        subStatus
+                    );
+
+                    showStatus(
+                        `Payment status: ${status}` +
+                        (subStatus
+                            ? ` - ${subStatus}`
+                            : "")
+                    );
+                },
+
+                yunoError: (
+                    message,
+                    data
+                ) => {
+
+                    console.error(
+                        "Yuno error:",
+                        message,
+                        data
+                    );
+
+                    showStatus(
+                        `Yuno error: ${message}`
+                    );
+                }
+            });
+
+            // Mount embedded checkout
+            await yuno.mountCheckout();
+
+            showStatus(
+                "Yuno checkout loaded successfully."
+            );
+
+            payButton.disabled = false;
+
+        } catch (error) {
+
+            console.error(
+                "Checkout initialization failed:",
+                error
+            );
+
+            showStatus(
+                "Checkout initialization failed: " +
+                error.message
+            );
+        }
+    }
+
+    // --------------------------------------------------
+    // PAY BUTTON
+    // --------------------------------------------------
+
+    payButton.addEventListener(
+        "click",
+        async () => {
+
+            try {
+
+                if (!yuno) {
+                    throw new Error(
+                        "Yuno is not initialized."
+                    );
+                }
+
+                showStatus(
+                    "Starting payment..."
+                );
+
+                await yuno.startPayment();
+
+            } catch (error) {
+
+                console.error(
+                    "Payment start error:",
+                    error
+                );
+
+                showStatus(
+                    "Payment start failed: " +
+                    error.message
+                );
+            }
+        }
+    );
+
+    // --------------------------------------------------
+    // START
+    // --------------------------------------------------
+
+    window.addEventListener(
+        "load",
+        initializeCheckout
+    );
+</script>
+
+</body>
+</html>
